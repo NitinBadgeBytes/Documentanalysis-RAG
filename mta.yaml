@@ -1,0 +1,100 @@
+_schema-version: 3.3.0
+ID: docqa
+description: A simple CAP project.
+version: 1.0.0
+modules:
+  - name: docqa-srv
+    type: nodejs
+    path: gen/srv
+    requires:
+      - name: docqa-auth
+      - name: docqa-db
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    parameters:
+      buildpack: nodejs_buildpack
+      instances: 1
+    build-parameters:
+      builder: npm-ci
+  - name: docqa-db-deployer
+    type: hdb
+    path: gen/db
+    requires:
+      - name: docqa-db
+    parameters:
+      buildpack: nodejs_buildpack
+  - name: docqa-app-content
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: docqa-repo-host
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - artifacts:
+            - comdocqadocqaui.zip
+          name: comdocqadocqaui
+          target-path: resources/
+  - name: comdocqadocqaui
+    type: html5
+    path: app/docqaui
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build:cf
+      supported-platforms:
+        []
+resources:
+  - name: docqa-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      config:
+        tenant-mode: dedicated
+        xsappname: docqa-${org}-${space}
+      path: ./xs-security.json
+      service: xsuaa
+      service-plan: application
+  - name: docqa-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: docqa-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-name: docqa-html5-service
+      service-plan: app-host
+  - name: docqa-destination-service
+    type: org.cloudfoundry.managed-service
+    parameters:
+      config:
+        HTML5Runtime_enabled: false
+        init_data:
+          instance:
+            destinations:
+              - Authentication: NoAuthentication
+                Name: ui5
+                ProxyType: Internet
+                Type: HTTP
+                URL: https://ui5.sap.com
+            existing_destinations_policy: update
+        version: 1.0.0
+      service: destination
+      service-name: docqa-destination-service
+      service-plan: lite
+parameters:
+  deploy_mode: html5-repo
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production

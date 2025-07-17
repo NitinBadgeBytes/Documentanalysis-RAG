@@ -1,0 +1,1 @@
+using DocQAService as service from '../../srv/service';
