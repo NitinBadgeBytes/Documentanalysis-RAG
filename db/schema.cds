@@ -10,5 +10,5 @@ entity Embeddings {
   key ID       : UUID;
   doc_ID       : Association to Documents;
   chunk        : LargeString;
-  vector       : LargeString; // Store JSON string of the vector
+  vector       : LargeString; 
 }

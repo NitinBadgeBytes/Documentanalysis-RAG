@@ -3,8 +3,16 @@ const pdf = require('pdf-parse');
 const { OpenAI } = require('openai');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '' // Replace or keep env
+  apiKey: process.env.OPENAI_API_KEY || '' 
 });
+
+// cds.on('bootstrap', app => {
+//   // Increase limit to 5MB (or more if needed)
+//   app.use(bodyParser.json({ limit: '5mb' }));
+//   app.use(bodyParser.raw({ limit: '5mb', type: '*/*' })); // Important for binary PDF uploads
+// });
+
+// module.exports = cds.server;
 
 module.exports = async function (srv) {
   const db = await cds.connect.to('db');
@@ -39,7 +47,9 @@ return id;
 
       if (!doc || !doc.content) return req.error(404, 'Document not found.');
 
-      const chunks = splitTextByQuestion(doc.content);
+      //const chunks = splitTextByQuestion(doc.content);
+      const chunks = splitTextSmart(doc.content);
+
       const BATCH_SIZE = 50;
 
       for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
@@ -131,10 +141,28 @@ function cosineSimilarity(vecA, vecB) {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-// --- Utility: Q&A Chunk Splitter
-function splitTextByQuestion(text) {
-  return text
-    .split(/(?:\r?\n)?Q\.\s+(?=[A-Z])/g)
-    .map((chunk, idx) => idx === 0 ? chunk.trim() : 'Q. ' + chunk.trim())
-    .filter(c => c.length >= 30);
+// earlier code 
+// function splitTextByQuestion(text) {
+//   return text
+//     .split(/(?:\r?\n)?Q\.\s+(?=[A-Z])/g)
+//     .map((chunk, idx) => idx === 0 ? chunk.trim() : 'Q. ' + chunk.trim())
+//     .filter(c => c.length >= 30);
+// }
+
+// recent changes for smart behaviour (QuestionAnswer & Paragraph)
+function splitTextSmart(text, maxLength = 500) {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text]; 
+  const chunks = [];
+  let currentChunk = '';
+
+  for (let sentence of sentences) {
+    if ((currentChunk + sentence).length > maxLength) {
+      chunks.push(currentChunk.trim());
+      currentChunk = '';
+    }
+    currentChunk += sentence + ' ';
+  }
+
+  if (currentChunk.trim()) chunks.push(currentChunk.trim());
+  return chunks.filter(c => c.length >= 30);
 }
