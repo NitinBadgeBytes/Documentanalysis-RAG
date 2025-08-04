@@ -14,9 +14,9 @@ const FormData = require('form-data');
 const { Readable } = require('stream');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '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' 
+  apiKey: process.env.OPENAI_API_KEY || '' 
 });
-const ASSEMBLY_API_KEY = '2408e2c29ec644a2881ab30d9045d465';
+const ASSEMBLY_API_KEY = '';
 //2408e2c29ec644a2881ab30d9045d465
 // cds.on('bootstrap', app => {
 //   // Increase limit to 5MB (or more if needed)
