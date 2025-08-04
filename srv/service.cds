@@ -16,4 +16,14 @@ service DocQAService {
   action GenerateEmbeddings(docID: UUID) returns String;
 //   action AskQuestion(question: String) returns String;
  action AskQuestion(question: String, docID: UUID) returns AskQuestionResult;
+     action ScrapeWebPage(url: String) returns String;
+     entity AskedQuestions as projection on db.AskedQuestions;
+
+    //  newly added
+     action TranscribeVoice(
+    filename: String,
+    filetype: String,
+    filedata: LargeString
+  ) returns String;
+     
 };

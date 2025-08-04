@@ -12,3 +12,10 @@ entity Embeddings {
   chunk        : LargeString;
   vector       : LargeString; 
 }
+
+entity AskedQuestions {
+  key ID          : UUID;
+  Question    : String;
+  Answer      : LargeString;
+  CreatedAt   : Timestamp;
+}
