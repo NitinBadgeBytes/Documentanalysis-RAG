@@ -16,14 +16,18 @@ const { Readable } = require('stream');
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '' 
 });
+
 const ASSEMBLY_API_KEY = '';
+//2408e2c29ec644a2881ab30d9045d465
+
+// const ASSEMBLY_API_KEY = '2408e2c29ec644a2881ab30d9045d465';
 //2408e2c29ec644a2881ab30d9045d465
 // cds.on('bootstrap', app => {
 //   // Increase limit to 5MB (or more if needed)
 //   app.use(bodyParser.json({ limit: '5mb' }));
 //   app.use(bodyParser.raw({ limit: '5mb', type: '*/*' })); // Important for binary PDF uploads
 // });
-//////
+//
 // module.exports = cds.server;
 
 module.exports = async function (srv) {
