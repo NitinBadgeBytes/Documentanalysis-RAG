@@ -26,4 +26,8 @@ service DocQAService {
     filedata: LargeString
   ) returns String;
      
+   // Custom Action: Summarize uploaded document
+  action SummarizeDocument(docID: UUID) returns {
+    summary: String(5000);
+  };
 };

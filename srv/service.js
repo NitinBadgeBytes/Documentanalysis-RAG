@@ -18,10 +18,8 @@ const openai = new OpenAI({
 });
 
 const ASSEMBLY_API_KEY = '';
-//2408e2c29ec644a2881ab30d9045d465
-//
-// const ASSEMBLY_API_KEY = '2408e2c29ec644a2881ab30d9045d465';
-//2408e2c29ec644a2881ab30d9045d465
+//...
+
 // cds.on('bootstrap', app => {
 //   // Increase limit to 5MB (or more if needed)
 //   app.use(bodyParser.json({ limit: '5mb' }));
@@ -34,45 +32,227 @@ module.exports = async function (srv) {
   const db = await cds.connect.to('db');
    
    // Upload document
-   srv.on("UploadDocument", async (req) => {
-    const { filename, content } = req.data;
-    const buffer = Buffer.from(content, "base64");
-    const ext = path.extname(filename).toLowerCase();
+  //  srv.on("UploadDocument", async (req) => {
+  //   const { filename, content } = req.data;
+  //   const buffer = Buffer.from(content, "base64");
+  //   const ext = path.extname(filename).toLowerCase();
 
-    let text = "";
-    try {
-      if (ext === ".pdf") {
-        const parsed = await pdf(buffer);
-        text = parsed.text;
-      } else if (ext === ".txt") {
-        text = buffer.toString("utf-8");
-      } else if (ext === ".docx") {
-        const result = await mammoth.extractRawText({ buffer });
-        text = result.value;
-      } else if (ext === ".xlsx") {
-        const workbook = xlsx.read(buffer, { type: "buffer" });
-        text = workbook.SheetNames.map(sheet =>
-          xlsx.utils.sheet_to_csv(workbook.Sheets[sheet])
-        ).join("\n");
-      } else if (ext === ".pptx") {
-        text = await extractPPTXText(buffer);
-      } else {
-        return req.error(400, "Unsupported file type");
-      }
+  //   let text = "";
+  //   try {
+  //     if (ext === ".pdf") {
+  //       const parsed = await pdf(buffer);
+  //       text = parsed.text;
+  //     } else if (ext === ".txt") {
+  //       text = buffer.toString("utf-8");
+  //     } else if (ext === ".docx") {
+  //       const result = await mammoth.extractRawText({ buffer });
+  //       text = result.value;
+  //     } else if (ext === ".xlsx") {
+  //       const workbook = xlsx.read(buffer, { type: "buffer" });
+  //       text = workbook.SheetNames.map(sheet =>
+  //         xlsx.utils.sheet_to_csv(workbook.Sheets[sheet])
+  //       ).join("\n");
+  //     } else if (ext === ".pptx") {
+  //       text = await extractPPTXText(buffer);
+  //     } else {
+  //       return req.error(400, "Unsupported file type");
+  //     }
 
-      const id = cds.utils.uuid();
-      await INSERT.into("docqa.Documents").entries({
-        ID: id,
-        filename,
-        content: text
-      });
+  //     const id = cds.utils.uuid();
+  //     await INSERT.into("docqa.Documents").entries({
+  //       ID: id,
+  //       filename,
+  //       content: text
+  //     });
 
-      return id;
-    } catch (err) {
-      console.error("File parse error:", err.message);
-      req.error(500, "Failed to parse file content");
+  //     return id;
+  //   } catch (err) {
+  //     console.error("File parse error:", err.message);
+  //     req.error(500, "Failed to parse file content");
+  //   }
+  // });
+
+   //upload document real one
+//    srv.on("UploadDocument", async (req) => {
+//   const { filename, content } = req.data;
+//   const buffer = Buffer.from(content, "base64");
+//   const ext = path.extname(filename).toLowerCase();
+
+//   let text = "";
+//   try {
+//     // Step 1: Extract text from file based on extension
+//     if (ext === ".pdf") {
+//       const parsed = await pdf(buffer);
+//       text = parsed.text;
+//     } else if (ext === ".txt") {
+//       text = buffer.toString("utf-8");
+//     } else if (ext === ".docx") {
+//       const result = await mammoth.extractRawText({ buffer });
+//       text = result.value;
+//     } else if (ext === ".xlsx") {
+//       const workbook = xlsx.read(buffer, { type: "buffer" });
+//       text = workbook.SheetNames.map(sheet =>
+//         xlsx.utils.sheet_to_csv(workbook.Sheets[sheet])
+//       ).join("\n");
+//     } else if (ext === ".pptx") {
+//       text = await extractPPTXText(buffer);
+//     } else {
+//       return req.error(400, "Unsupported file type");
+//     }
+
+//     // Step 2: Optional - Detect language (simple check)
+//     // For simplicity, we will translate all documents to English
+//     const translateRes = await openai.chat.completions.create({
+//       model: "gpt-4o-mini",
+//       messages: [
+//         {
+//           role: "system",
+//           content: "You are a translator. Convert the following text to clear English."
+//         },
+//         {
+//           role: "user",
+//           content: text
+//         }
+//       ]
+//     });
+
+//     text = translateRes.choices[0].message.content.trim();
+
+//     // Step 3: Store the English text in DB
+//     const id = cds.utils.uuid();
+//     await INSERT.into("docqa.Documents").entries({
+//       ID: id,
+//       filename,
+//       content: text
+//     });
+
+//     return id;
+
+//   } catch (err) {
+//     console.error("File parse or translation error:", err.message);
+//     req.error(500, "Failed to parse or translate file content");
+//   }
+// });
+
+ //upload document updated 
+ srv.on("UploadDocument", async (req) => {
+  const { filename, content } = req.data;
+  const buffer = Buffer.from(content, "base64");
+  const ext = path.extname(filename).toLowerCase();
+
+  let text = "";
+  try {
+    // Step 1: Extract text
+    if (ext === ".pdf") {
+      const parsed = await pdf(buffer);
+      text = parsed.text;
+    } else if (ext === ".txt") {
+      text = buffer.toString("utf-8");
+    } else if (ext === ".docx") {
+      const result = await mammoth.extractRawText({ buffer });
+      text = result.value;
+    } else if (ext === ".xlsx") {
+      const workbook = xlsx.read(buffer, { type: "buffer" });
+      text = workbook.SheetNames.map(sheet =>
+        xlsx.utils.sheet_to_csv(workbook.Sheets[sheet])
+      ).join("\n");
+    } else if (ext === ".pptx") {
+      text = await extractPPTXText(buffer);
+    } else {
+      return req.error(400, "Unsupported file type");
     }
-  });
+
+    // Step 2: Detect language
+    const langRes = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Detect the language of the following text. Reply only with ISO code (e.g., en, hi, or)." },
+        { role: "user", content: text.slice(0, 500) }
+      ]
+    });
+    let detectedLang = langRes.choices[0].message.content.trim().toLowerCase();
+    if (detectedLang === "ori") detectedLang = "or";
+
+    // Step 3: Translate into English for embeddings
+    let englishText = text;
+    if (detectedLang !== "en") {
+      const translateRes = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "Translate the following text into clear English legal terminology." },
+          { role: "user", content: text }
+        ]
+      });
+      englishText = translateRes.choices[0].message.content.trim();
+    }
+
+    const docID = cds.utils.uuid();
+
+    // Step 4: Save Document
+    await INSERT.into("docqa.Documents").entries({
+      ID: docID,
+      filename,
+      content: englishText
+    });
+
+    // Step 5: Split and store embeddings
+    function splitIntoChunks(str, size = 500) {
+      const words = str.split(/\s+/);
+      let chunks = [], current = [];
+      for (const word of words) {
+        if (current.join(" ").length + word.length > size) {
+          chunks.push(current.join(" "));
+          current = [];
+        }
+        current.push(word);
+      }
+      if (current.length) chunks.push(current.join(" "));
+      return chunks;
+    }
+
+    // English chunks + embeddings
+    const enChunks = splitIntoChunks(englishText);
+    for (const ch of enChunks) {
+      const emb = await openai.embeddings.create({
+        model: "text-embedding-3-large",
+        input: ch
+      });
+      await INSERT.into("docqa.Embeddings").entries({
+        ID: cds.utils.uuid(),
+        doc_ID: docID,
+        chunk: ch,
+        vector: JSON.stringify(emb.data[0].embedding),
+        lang: "en"
+      });
+    }
+
+    // Native embeddings (if not English)
+    if (detectedLang !== "en") {
+      const origChunks = splitIntoChunks(text);
+      for (const ch of origChunks) {
+        const emb = await openai.embeddings.create({
+          model: "text-embedding-3-large",
+          input: ch
+        });
+        await INSERT.into("docqa.Embeddings").entries({
+          ID: cds.utils.uuid(),
+          doc_ID: docID,
+          chunk: ch,
+          vector: JSON.stringify(emb.data[0].embedding),
+          lang: detectedLang
+        });
+      }
+    }
+
+    return docID;
+
+  } catch (err) {
+    console.error("Upload error:", err);
+    req.error(500, "Failed to process document");
+  }
+});
+
+
 
   // Generate embeddings
   srv.on('GenerateEmbeddings', async (req) => {
@@ -117,50 +297,273 @@ module.exports = async function (srv) {
     }
   });
 
-  // Ask question
-  srv.on('AskQuestion', async (req) => {
-    const { question, docID } = req.data;
+  // Ask question original one
+  // srv.on('AskQuestion', async (req) => {
+  //   const { question, docID } = req.data;
 
-    if (!question || !docID) return req.error(400, 'Missing question or docID.');
+  //   if (!question || !docID) return req.error(400, 'Missing question or docID.');
 
-    const qEmbedRes = await openai.embeddings.create({
-      model: 'text-embedding-3-large',
-      input: [question]
+  //   const qEmbedRes = await openai.embeddings.create({
+  //     model: 'text-embedding-3-large',
+  //     input: [question]
+  //   });
+
+  //   const qVector = qEmbedRes.data[0].embedding;
+
+  //   const chunks = await SELECT.from('docqa.Embeddings').where({ doc_ID: docID });
+  //   if (!chunks.length) return req.error(404, 'No embeddings for this document.');
+
+  //   const scored = chunks.map(c => {
+  //     const vec = JSON.parse(c.vector);
+  //     const sim = cosineSimilarity(vec, qVector);
+  //     return { ...c, similarity: sim };
+  //   });
+
+  //   const topChunks = scored.sort((a, b) => b.similarity - a.similarity).slice(0, 5);
+  //   const context = topChunks.map(c => c.chunk).join('\n\n');
+
+  //   const chatRes = await openai.chat.completions.create({
+  //     model: 'gpt-4o-mini',
+  //     messages: [
+  //       {
+  //         role: 'system',
+  //         content: `You are a helpful assistant. Answer only using the provided context. If unsure, say "The document does not contain this information."`
+  //       },
+  //       {
+  //         role: 'user',
+  //         content: `Context:\n${context}\n\nQuestion: ${question}`
+  //       }
+  //     ]
+  //   });
+
+  //   const answer = chatRes.choices[0].message.content;
+   
+  //   //  newly added here
+  //   // Save question and answer to history table
+  //   await INSERT.into('docqa.AskedQuestions').entries({
+  //     Question: question,
+  //     Answer: answer,
+  //     CreatedAt: new Date()
+  //   });
+
+  //   return {
+  //     answer,
+  //     highlights: topChunks.map(c => ({
+  //       similarity: c.similarity.toFixed(3),
+  //       excerpt: c.chunk
+  //     }))
+  //   };
+  // });
+
+  //multi language support
+  // --- Ask question with multilingual support ---
+// srv.on('AskQuestion', async (req) => {
+//   const { question, docID } = req.data;
+
+//   if (!question || !docID) return req.error(400, 'Missing question or docID.');
+
+//   try {
+//     // Step 1: Detect language
+//     const langRes = await openai.chat.completions.create({
+//       model: "gpt-4o-mini",
+//       messages: [
+//         { role: "system", content: "Detect the language of the following text. Reply only with the ISO code (e.g., en, hi, or, or for Odia)." },
+//         { role: "user", content: question }
+//       ]
+//     });
+//     const detectedLang = langRes.choices[0].message.content.trim().toLowerCase();
+
+//     // Step 2: Translate question to English (if not English)
+//     let translatedQuestion = question;
+//     if (detectedLang !== "en") {
+//       const transQ = await openai.chat.completions.create({
+//         model: "gpt-4o-mini",
+//         messages: [
+//           { role: "system", content: "Translate the following text to clear English." },
+//           { role: "user", content: question }
+//         ]
+//       });
+//       translatedQuestion = transQ.choices[0].message.content.trim();
+//     }
+
+//     // Step 3: Generate embedding for translated question
+//     const qEmbedRes = await openai.embeddings.create({
+//       model: 'text-embedding-3-large',
+//       input: [translatedQuestion]
+//     });
+//     const qVector = qEmbedRes.data[0].embedding;
+
+//     // Step 4: Fetch document embeddings
+//     const chunks = await SELECT.from('docqa.Embeddings').where({ doc_ID: docID });
+//     if (!chunks.length) return req.error(404, 'No embeddings for this document.');
+
+//     const scored = chunks.map(c => {
+//       const vec = JSON.parse(c.vector);
+//       const sim = cosineSimilarity(vec, qVector);
+//       return { ...c, similarity: sim };
+//     });
+
+//     const topChunks = scored.sort((a, b) => b.similarity - a.similarity).slice(0, 5);
+//     const context = topChunks.map(c => c.chunk).join('\n\n');
+
+//     // Step 5: Get answer in English
+//     const chatRes = await openai.chat.completions.create({
+//       model: 'gpt-4o-mini',
+//       messages: [
+//         {
+//           role: 'system',
+//           content: `You are a helpful assistant. Answer only using the provided context. 
+//           If unsure, say "The document does not contain this information."`
+//         },
+//         {
+//           role: 'user',
+//           content: `Context:\n${context}\n\nQuestion: ${translatedQuestion}`
+//         }
+//       ]
+//     });
+
+//     let answer = chatRes.choices[0].message.content.trim();
+
+//     // Step 6: Translate answer back to original language (if not English)
+//     if (detectedLang !== "en") {
+//       const backTrans = await openai.chat.completions.create({
+//         model: "gpt-4o-mini",
+//         messages: [
+//           { role: "system", content: `Translate this English text into ${detectedLang}.` },
+//           { role: "user", content: answer }
+//         ]
+//       });
+//       answer = backTrans.choices[0].message.content.trim();
+//     }
+
+//     // Step 7: Save Q&A history
+//     await INSERT.into('docqa.AskedQuestions').entries({
+//       Question: question,
+//       Answer: answer,
+//       CreatedAt: new Date()
+//     });
+
+//     return {
+//       answer,
+//       highlights: topChunks.map(c => ({
+//         similarity: c.similarity.toFixed(3),
+//         excerpt: c.chunk
+//       }))
+//     };
+//   } catch (err) {
+//     console.error('Error in AskQuestion:', err.message);
+//     req.error(500, 'Question answering failed.');
+//   }
+// });
+
+//multi language support with perfection
+srv.on("AskQuestion", async (req) => {
+  const { question, docID } = req.data;
+  if (!question || !docID) return req.error(400, "Missing question or docID.");
+
+  try {
+    // Step 1: Detect query language
+    const langRes = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Detect the language of the following text. Reply only with ISO code (e.g., en, hi, or)." },
+        { role: "user", content: question }
+      ]
     });
+    let qLang = langRes.choices[0].message.content.trim().toLowerCase();
+    if (qLang === "ori" || qLang === "rom-ori") qLang = "or";
 
-    const qVector = qEmbedRes.data[0].embedding;
+    // Step 2: Translate question → English
+    let translatedQuestion = question;
+    if (qLang !== "en") {
+      const transQ = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "Translate into precise English legal terminology." },
+          { role: "user", content: question }
+        ]
+      });
+      translatedQuestion = transQ.choices[0].message.content.trim();
+    }
 
-    const chunks = await SELECT.from('docqa.Embeddings').where({ doc_ID: docID });
-    if (!chunks.length) return req.error(404, 'No embeddings for this document.');
+    // Step 3: Embed question (English + native if not English)
+    const enQEmb = await openai.embeddings.create({
+      model: "text-embedding-3-large",
+      input: translatedQuestion
+    });
+    const enVec = enQEmb.data[0].embedding;
+
+    let nativeVec = null;
+    if (qLang !== "en") {
+      const nativeEmb = await openai.embeddings.create({
+        model: "text-embedding-3-large",
+        input: question
+      });
+      nativeVec = nativeEmb.data[0].embedding;
+    }
+
+    // Step 4: Fetch embeddings from DB
+    const chunks = await SELECT.from("docqa.Embeddings").where({ doc_ID: docID });
+    if (!chunks.length) return req.error(404, "No embeddings found.");
+
+    function cosineSimilarity(a, b) {
+      let dot = 0, normA = 0, normB = 0;
+      for (let i = 0; i < a.length; i++) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+      }
+      return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
 
     const scored = chunks.map(c => {
       const vec = JSON.parse(c.vector);
-      const sim = cosineSimilarity(vec, qVector);
+      let sim = 0;
+      if (c.lang === "en") sim = cosineSimilarity(vec, enVec);
+      else if (c.lang === qLang && nativeVec) sim = cosineSimilarity(vec, nativeVec);
       return { ...c, similarity: sim };
     });
 
     const topChunks = scored.sort((a, b) => b.similarity - a.similarity).slice(0, 5);
-    const context = topChunks.map(c => c.chunk).join('\n\n');
+    const context = topChunks.map(c => c.chunk).join("\n\n");
 
+    // Step 5: Get English answer from context
     const chatRes = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: 'system',
-          content: `You are a helpful assistant. Answer only using the provided context. If unsure, say "The document does not contain this information."`
+          role: "system",
+          content: `You are a strict retrieval QA assistant. Answer only by copying exact sentences from the context.`
         },
         {
-          role: 'user',
-          content: `Context:\n${context}\n\nQuestion: ${question}`
+          role: "user",
+          content: `Context:\n${context}\n\nQuestion: ${translatedQuestion}`
         }
       ]
     });
 
-    const answer = chatRes.choices[0].message.content;
-   
-    //  newly added here
-    // Save question and answer to history table
-    await INSERT.into('docqa.AskedQuestions').entries({
+    let answer = chatRes.choices[0].message.content.trim();
+    if (!answer) answer = topChunks[0].chunk;
+
+    // Step 6: Translate answer back
+    if (qLang !== "en") {
+      const backTrans = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Translate this English text into ${qLang}. 
+                      If Odia, use Odia script. If Hindi, use Devanagari script.`
+          },
+          { role: "user", content: answer }
+        ]
+      });
+      answer = backTrans.choices[0].message.content.trim();
+    }
+
+    // Step 7: Save Q&A
+    await INSERT.into("docqa.AskedQuestions").entries({
+      ID: cds.utils.uuid(),
       Question: question,
       Answer: answer,
       CreatedAt: new Date()
@@ -170,10 +573,20 @@ module.exports = async function (srv) {
       answer,
       highlights: topChunks.map(c => ({
         similarity: c.similarity.toFixed(3),
-        excerpt: c.chunk
+        excerpt: c.chunk,
+        lang: c.lang
       }))
     };
-  });
+
+  } catch (err) {
+    console.error("AskQuestion error:", err);
+    req.error(500, "Question answering failed.");
+  }
+});
+
+
+
+
 
   // Scrape Web Page
 srv.on("ScrapeWebPage", async (req) => {
@@ -263,6 +676,44 @@ srv.on('TranscribeVoice', async (req) => {
     req.error(500, 'Transcription failed: ' + err.message);
   }
 });
+
+  // summary of uploaded documents
+  // --- Summarize Document ---
+srv.on("SummarizeDocument", async (req) => {
+  try {
+    const { docID } = req.data;
+    if (!docID) return req.error(400, "Missing docID.");
+
+    // Step 1: Fetch document from DB
+    const doc = await SELECT.one.from("docqa.Documents").where({ ID: docID });
+    if (!doc || !doc.content) return req.error(404, "Document not found.");
+
+    // Step 2: Generate summary using OpenAI
+    const summaryRes = await openai.chat.completions.create({
+      model: "gpt-4o-mini",   // fast + cost-efficient
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant. Provide a clear, concise summary of the following document in bullet points."
+        },
+        {
+          role: "user",
+          content: doc.content.substring(0, 8000) // avoid token overflow
+        }
+      ]
+    });
+
+    const summary = summaryRes.choices[0].message.content.trim();
+
+    // Step 3: Return directly
+    return { summary };
+
+  } catch (err) {
+    console.error("Error generating summary:", err.message);
+    req.error(500, "Failed to summarize document.");
+  }
+});
+
 
 };
 

@@ -11,6 +11,7 @@ entity Embeddings {
   doc_ID       : Association to Documents;
   chunk        : LargeString;
   vector       : LargeString; 
+   lang         : String(5);   // 'en', 'or', 'hi', etc. newly  added
 }
 
 entity AskedQuestions {

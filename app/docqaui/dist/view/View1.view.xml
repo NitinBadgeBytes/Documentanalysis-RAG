@@ -1,10 +1,11 @@
 <mvc:View controllerName="com.docqa.docqaui.controller.View1"
     xmlns:mvc="sap.ui.core.mvc"
+    	xmlns:u="sap.ui.unified"
     xmlns="sap.m">
     <Page id="page" title="{i18n>title}">
       <content>
       <VBox class="sapUiSmallMargin">
-    <FileUploader
+    <u:FileUploader
       id="fileUploader"
       name="uploadFile"
       change="onFileChange"
