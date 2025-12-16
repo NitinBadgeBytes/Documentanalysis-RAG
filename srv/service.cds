@@ -30,4 +30,7 @@ service DocQAService {
   action SummarizeDocument(docID: UUID) returns {
     summary: String(5000);
   };
+   action textToAudio(
+    text : String
+  ) returns Binary;
 };

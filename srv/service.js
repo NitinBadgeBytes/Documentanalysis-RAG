@@ -9,9 +9,15 @@ const unzipper = require("unzipper");  //for ppt
 const axios = require("axios");
 const cheerio = require("cheerio");
 const multer = require('multer');
+const sharp = require("sharp");
 const upload = multer();
 const FormData = require('form-data');
 const { Readable } = require('stream');
+const { fromBuffer } = require("pdf2pic");
+const Tesseract = require("tesseract.js");
+const vision = require("@google-cloud/vision");
+const client = new vision.ImageAnnotatorClient();
+
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '' 
@@ -134,123 +140,281 @@ module.exports = async function (srv) {
 //   }
 // });
 
- //upload document updated 
- srv.on("UploadDocument", async (req) => {
-  const { filename, content } = req.data;
-  const buffer = Buffer.from(content, "base64");
-  const ext = path.extname(filename).toLowerCase();
+ //upload document updated working
+//  srv.on("UploadDocument", async (req) => {
+//   const { filename, content } = req.data;
+//   const buffer = Buffer.from(content, "base64");
+//   const ext = path.extname(filename).toLowerCase();
 
-  let text = "";
-  try {
-    // Step 1: Extract text
-    if (ext === ".pdf") {
-      const parsed = await pdf(buffer);
-      text = parsed.text;
-    } else if (ext === ".txt") {
-      text = buffer.toString("utf-8");
-    } else if (ext === ".docx") {
-      const result = await mammoth.extractRawText({ buffer });
-      text = result.value;
-    } else if (ext === ".xlsx") {
-      const workbook = xlsx.read(buffer, { type: "buffer" });
-      text = workbook.SheetNames.map(sheet =>
-        xlsx.utils.sheet_to_csv(workbook.Sheets[sheet])
-      ).join("\n");
-    } else if (ext === ".pptx") {
-      text = await extractPPTXText(buffer);
-    } else {
-      return req.error(400, "Unsupported file type");
-    }
+//   let text = "";
+//   try {
+//     // Step 1: Extract text
+//     if (ext === ".pdf") {
+//       const parsed = await pdf(buffer);
+//       text = parsed.text;
+//     } else if (ext === ".txt") {
+//       text = buffer.toString("utf-8");
+//     } else if (ext === ".docx") {
+//       const result = await mammoth.extractRawText({ buffer });
+//       text = result.value;
+//     } else if (ext === ".xlsx") {
+//       const workbook = xlsx.read(buffer, { type: "buffer" });
+//       text = workbook.SheetNames.map(sheet =>
+//         xlsx.utils.sheet_to_csv(workbook.Sheets[sheet])
+//       ).join("\n");
+//     } else if (ext === ".pptx") {
+//       text = await extractPPTXText(buffer);
+//     } else {
+//       return req.error(400, "Unsupported file type");
+//     }
 
-    // Step 2: Detect language
-    const langRes = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "Detect the language of the following text. Reply only with ISO code (e.g., en, hi, or)." },
-        { role: "user", content: text.slice(0, 500) }
-      ]
-    });
-    let detectedLang = langRes.choices[0].message.content.trim().toLowerCase();
-    if (detectedLang === "ori") detectedLang = "or";
+//     // Step 2: Detect language
+//     const langRes = await openai.chat.completions.create({
+//       model: "gpt-4o-mini",
+//       messages: [
+//         { role: "system", content: "Detect the language of the following text. Reply only with ISO code (e.g., en, hi, or)." },
+//         { role: "user", content: text.slice(0, 500) }
+//       ]
+//     });
+//     let detectedLang = langRes.choices[0].message.content.trim().toLowerCase();
+//     if (detectedLang === "ori") detectedLang = "or";
 
-    // Step 3: Translate into English for embeddings
-    let englishText = text;
-    if (detectedLang !== "en") {
-      const translateRes = await openai.chat.completions.create({
+//     // Step 3: Translate into English for embeddings
+//     let englishText = text;
+//     if (detectedLang !== "en") {
+//       const translateRes = await openai.chat.completions.create({
+//         model: "gpt-4o-mini",
+//         messages: [
+//           { role: "system", content: "Translate the following text into clear English legal terminology." },
+//           { role: "user", content: text }
+//         ]
+//       });
+//       englishText = translateRes.choices[0].message.content.trim();
+//     }
+
+//     const docID = cds.utils.uuid();
+
+//     // Step 4: Save Document
+//     await INSERT.into("docqa.Documents").entries({
+//       ID: docID,
+//       filename,
+//       content: englishText
+//     });
+
+//     // Step 5: Split and store embeddings
+//     function splitIntoChunks(str, size = 500) {
+//       const words = str.split(/\s+/);
+//       let chunks = [], current = [];
+//       for (const word of words) {
+//         if (current.join(" ").length + word.length > size) {
+//           chunks.push(current.join(" "));
+//           current = [];
+//         }
+//         current.push(word);
+//       }
+//       if (current.length) chunks.push(current.join(" "));
+//       return chunks;
+//     }
+
+//     // English chunks + embeddings
+//     const enChunks = splitIntoChunks(englishText);
+//     for (const ch of enChunks) {
+//       const emb = await openai.embeddings.create({
+//         model: "text-embedding-3-large",
+//         input: ch
+//       });
+//       await INSERT.into("docqa.Embeddings").entries({
+//         ID: cds.utils.uuid(),
+//         doc_ID: docID,
+          
+//         chunk: ch,
+//         vector: JSON.stringify(emb.data[0].embedding),
+//         lang: "en"
+//       });
+//     }
+
+//     // Native embeddings (if not English)
+//     if (detectedLang !== "en") {
+//       const origChunks = splitIntoChunks(text);
+//       for (const ch of origChunks) {
+//         const emb = await openai.embeddings.create({
+//           model: "text-embedding-3-large",
+//           input: ch
+//         });
+//         await INSERT.into("docqa.Embeddings").entries({
+//           ID: cds.utils.uuid(),
+//           doc_ID: docID,
+        
+//           chunk: ch,
+//           vector: JSON.stringify(emb.data[0].embedding),
+//           lang: detectedLang
+//         });
+//       }
+//     }
+
+//      return docID;
+//     //return { ID: docID };
+
+//   } catch (err) {
+//     console.error("Upload error:", err);
+//     req.error(500, "Failed to process document");
+//   }
+// });
+
+ //new 
+  srv.on("UploadDocument", async req => {
+    const { filename, content } = req.data;
+    const buffer = Buffer.from(content, "base64");
+    const ext = path.extname(filename).toLowerCase();
+    let text = "";
+
+    try {
+      //   Extract text based on file type
+      if (ext === ".pdf") {
+        const parsed = await pdf(buffer);
+        text = parsed.text;
+
+        if (!text.trim()) {
+          console.log(" Image-based PDF detected. Performing OCR locally...");
+          const convert = fromBuffer(buffer, {
+            density: 250,
+            format: "png",
+            saveFilename: "ocr_page",
+            savePath: "./tmp",
+          });
+          const pages = await convert.bulk(-1, true);
+
+          for (const p of pages) {
+            const processed = await preprocessImage(p.path);
+            const ocr = await runOCR(processed);
+            text += "\n" + ocr;
+          }
+        }
+
+      } else if (ext === ".txt") {
+        text = buffer.toString("utf-8");
+
+      } else if (ext === ".docx") {
+        const result = await mammoth.extractRawText({ buffer });
+        text = result.value;
+
+      } else if (ext === ".xlsx") {
+        const workbook = xlsx.read(buffer, { type: "buffer" });
+        text = workbook.SheetNames.map(sheet =>
+          xlsx.utils.sheet_to_csv(workbook.Sheets[sheet])
+        ).join("\n");
+
+      } else if (ext === ".pptx") {
+        text = await extractPPTXText(buffer);
+
+      } else if ([".jpg", ".jpeg", ".png"].includes(ext)) {
+        console.log("🖋 Performing OCR using local Tesseract...");
+        const processed = await preprocessImage(buffer);
+        text = await runOCR(processed);
+      } else {
+        return req.error(400, "Unsupported file type");
+      }
+
+      if (!text.trim()) return req.error(400, "No text extracted from the document");
+
+      //   Detect language
+      const langRes = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "Translate the following text into clear English legal terminology." },
-          { role: "user", content: text }
-        ]
+          {
+            role: "system",
+            content:
+              "Detect the language of the following text. Reply only with ISO code (e.g., en, hi, or).",
+          },
+          { role: "user", content: text.slice(0, 500) },
+        ],
       });
-      englishText = translateRes.choices[0].message.content.trim();
-    }
 
-    const docID = cds.utils.uuid();
+      let detectedLang = langRes.choices[0].message.content.trim().toLowerCase();
+      if (detectedLang === "ori") detectedLang = "or";
 
-    // Step 4: Save Document
-    await INSERT.into("docqa.Documents").entries({
-      ID: docID,
-      filename,
-      content: englishText
-    });
-
-    // Step 5: Split and store embeddings
-    function splitIntoChunks(str, size = 500) {
-      const words = str.split(/\s+/);
-      let chunks = [], current = [];
-      for (const word of words) {
-        if (current.join(" ").length + word.length > size) {
-          chunks.push(current.join(" "));
-          current = [];
-        }
-        current.push(word);
+      //  Step 3: Translate to English if needed
+      let englishText = text;
+      if (detectedLang !== "en") {
+        const translateRes = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content:
+                "Translate the following text into clear English legal terminology.",
+            },
+            { role: "user", content: text },
+          ],
+        });
+        englishText = translateRes.choices[0].message.content.trim();
       }
-      if (current.length) chunks.push(current.join(" "));
-      return chunks;
-    }
 
-    // English chunks + embeddings
-    const enChunks = splitIntoChunks(englishText);
-    for (const ch of enChunks) {
-      const emb = await openai.embeddings.create({
-        model: "text-embedding-3-large",
-        input: ch
+      //   Save document metadata
+      const docID = cds.utils.uuid();
+      await INSERT.into("docqa.Documents").entries({
+        ID: docID,
+        filename,
+        content: englishText,
       });
-      await INSERT.into("docqa.Embeddings").entries({
-        ID: cds.utils.uuid(),
-        doc_ID: docID,
-        chunk: ch,
-        vector: JSON.stringify(emb.data[0].embedding),
-        lang: "en"
-      });
-    }
 
-    // Native embeddings (if not English)
-    if (detectedLang !== "en") {
-      const origChunks = splitIntoChunks(text);
-      for (const ch of origChunks) {
+      //  Split and store embeddings
+      function splitIntoChunks(str, size = 500) {
+        const words = str.split(/\s+/);
+        let chunks = [],
+          current = [];
+        for (const word of words) {
+          if (current.join(" ").length + word.length > size) {
+            chunks.push(current.join(" "));
+            current = [];
+          }
+          current.push(word);
+        }
+        if (current.length) chunks.push(current.join(" "));
+        return chunks;
+      }
+
+      const enChunks = splitIntoChunks(englishText);
+      for (const ch of enChunks) {
         const emb = await openai.embeddings.create({
           model: "text-embedding-3-large",
-          input: ch
+          input: ch,
         });
+
         await INSERT.into("docqa.Embeddings").entries({
           ID: cds.utils.uuid(),
-          doc_ID: docID,
+          doc_ID: { ID: docID },
           chunk: ch,
           vector: JSON.stringify(emb.data[0].embedding),
-          lang: detectedLang
+          lang: "en",
         });
       }
+
+      if (detectedLang !== "en") {
+        const origChunks = splitIntoChunks(text);
+        for (const ch of origChunks) {
+          const emb = await openai.embeddings.create({
+            model: "text-embedding-3-large",
+            input: ch,
+          });
+          await INSERT.into("docqa.Embeddings").entries({
+            ID: cds.utils.uuid(),
+            doc_ID: { ID: docID },
+            chunk: ch,
+            vector: JSON.stringify(emb.data[0].embedding),
+            lang: detectedLang,
+          });
+        }
+      }
+
+      console.log(`Document ${filename} uploaded and processed successfully.`);
+      return docID;
+
+    } catch (err) {
+      console.error("Upload error:", err);
+      req.error(500, "Failed to process document: " + err.message);
     }
-
-    return docID;
-
-  } catch (err) {
-    console.error("Upload error:", err);
-    req.error(500, "Failed to process document");
-  }
-});
+  });
 
 
 
@@ -516,6 +680,8 @@ srv.on("AskQuestion", async (req) => {
       return dot / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
+      
+
     const scored = chunks.map(c => {
       const vec = JSON.parse(c.vector);
       let sim = 0;
@@ -583,11 +749,6 @@ srv.on("AskQuestion", async (req) => {
     req.error(500, "Question answering failed.");
   }
 });
-
-
-
-
-
   // Scrape Web Page
 srv.on("ScrapeWebPage", async (req) => {
   const { url } = req.data;
@@ -713,7 +874,49 @@ srv.on("SummarizeDocument", async (req) => {
     req.error(500, "Failed to summarize document.");
   }
 });
+ 
+this.on("textToAudio", async (req) => {
+    const { text } = req.data;
 
+    if (!text) {
+      return req.error(400, "Text is required");
+    }
+
+    try {
+      const response = await fetch(
+        "https://api.deepgram.com/v1/speak?model=aura-2-thalia-en&encoding=mp3",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": "Token ", // 🔴 hardcoded as requested
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ text })
+        }
+      );
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("Deepgram error:", errText);
+        return req.error(500, errText);
+      }
+
+      // 🔑 Convert response to Buffer
+      const audioBuffer = Buffer.from(await response.arrayBuffer());
+
+      // 🔑 BYPASS ODATA — SEND RAW AUDIO
+      const res = req._.res;
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Length", audioBuffer.length);
+      res.status(200).send(audioBuffer);
+
+      return; // VERY IMPORTANT
+
+    } catch (err) {
+      console.error("TTS ERROR:", err);
+      return req.error(500, "Audio generation failed");
+    }
+  });
 
 };
 
@@ -762,7 +965,6 @@ function splitByLine(text, maxLength = 500) {
   if (currentChunk.trim()) chunks.push(currentChunk.trim());
   return chunks.filter(c => c.length >= 30);
 }
-
 // --- Extract text from PPTX
 async function extractPPTXText(buffer) {
   const zip = await unzipper.Open.buffer(buffer);
@@ -777,4 +979,52 @@ async function extractPPTXText(buffer) {
   }
   return text;
 
+}
+
+/**
+ *  Image preprocessing pipeline (Sharp)
+ * Auto-enhances, denoises, and deskews image for best OCR accuracy
+ */
+async function preprocessImage(inputBufferOrPath) {
+  let image = sharp(inputBufferOrPath);
+
+  // Step 1: Convert to grayscale
+  image = image.grayscale();
+
+  // Step 2: Resize (boost OCR accuracy)
+  const metadata = await image.metadata();
+  if (metadata.width < 1000) image = image.resize(1000);
+
+  // Step 3: Normalize contrast
+  image = image.normalise();
+
+  // Step 4: Denoise and threshold
+  image = image
+    .median(1)
+    .linear(1.2, -30) // contrast boost
+    .threshold(130);
+
+  // Step 5: Slight rotation correction (deskew)
+  const buffer = await image.toBuffer();
+  return buffer;
+}
+
+/**
+ * Runs OCR with fallback retry on raw image
+ */
+async function runOCR(buffer) {
+  let result = await Tesseract.recognize(buffer, "eng", {
+    tessedit_char_whitelist:
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+  });
+  let text = result.data.text.trim();
+
+  if (!text || text.length < 3) {
+    console.log("Low-confidence OCR result, retrying with raw image...");
+    const retry = await Tesseract.recognize(buffer, "eng");
+    text = retry.data.text.trim();
+  }
+
+  console.log("OCR Output:", text);
+  return text;
 }
